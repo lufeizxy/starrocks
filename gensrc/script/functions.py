@@ -759,7 +759,8 @@ vectorized_functions = [
      "JsonFunctions::native_json_path_prepare", "JsonFunctions::native_json_path_close"],
     [110021, "get_json_bool", False, False, "BOOLEAN", ["JSON", "VARCHAR"], "JsonFunctions::get_native_json_bool",
      "JsonFunctions::native_json_path_prepare", "JsonFunctions::native_json_path_close"],
-
+    [110022, "get_json_object_spark", False, False, "VARCHAR", ["JSON", "VARCHAR"], "JsonFunctions::get_native_json_string_spark",
+     "JsonFunctions::native_json_path_prepare", "JsonFunctions::native_json_path_close"],
 
     # json type function
     [110003, "parse_json", False, False, "JSON", ["VARCHAR"], "JsonFunctions::parse_json"],

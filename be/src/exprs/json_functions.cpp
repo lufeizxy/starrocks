@@ -313,6 +313,10 @@ StatusOr<ColumnPtr> JsonFunctions::get_native_json_string(FunctionContext* conte
     return _json_query_impl<TYPE_VARCHAR>(context, columns);
 }
 
+StatusOr<ColumnPtr> JsonFunctions::get_native_json_string_spark(FunctionContext* context, const Columns& columns) {
+    return _json_query_impl_spark<TYPE_VARCHAR>(context, columns);
+}
+
 StatusOr<ColumnPtr> JsonFunctions::parse_json(FunctionContext* context, const Columns& columns) {
     int num_rows = columns[0]->size();
     ColumnViewer<TYPE_VARCHAR> viewer(columns[0]);
@@ -1153,9 +1157,92 @@ StatusOr<ColumnPtr> JsonFunctions::_json_keys_without_path(FunctionContext* cont
     return result.build(ColumnHelper::is_all_const(columns));
 }
 
+std::string JsonFunctions::extract_first_json_string(const std::string& input){
+    int count = 0;
+    size_t start_pos = std::string::npos;
+    size_t end_pos = std::string::npos;
+
+    for(size_t i = 0;i<input.length();++i){
+        if(input[i] == '{'){
+            if(count == 0){
+                start_pos = i;
+            }
+            count++;
+        }
+        if(input[i] == '}'){
+            count--;
+            if(count == 0){
+                end_pos = i + 1;
+                break;
+            }
+        }
+    }
+    if(start_pos != std::string::npos && end_pos != std::string::npos){
+        return input.substr(start_pos,end_pos - start_pos);
+    }else{
+        return "";
+    }
+}
+
 StatusOr<ColumnPtr> JsonFunctions::to_json(FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
     return cast_nested_to_json(columns[0], context->allow_throw_exception());
+}
+
+template <LogicalType ResultType>
+StatusOr<ColumnPtr> JsonFunctions::_json_query_impl_spark(FunctionContext* context, const Columns& columns) {
+    auto num_rows = columns[0]->size();
+    auto json_viewer = ColumnViewer<TYPE_JSON>(columns[0]);
+    auto path_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
+    ColumnBuilder<ResultType> result(num_rows);
+
+    JsonPath stored_path;
+    vpack::Builder builder;
+    for (int row = 0; row < num_rows; ++row) {
+
+        JsonValue* json_value = nullptr;
+        std::string path_string = path_viewer.value(row).to_string();
+
+        if (path_viewer.is_null(row) || path_string.find_first_not_of(" \t\n\r") != '$'){
+            result.append_null();
+            continue;
+        }
+        if(!json_viewer.is_null(row)){
+            json_value = json_viewer.value(row);
+        } else {
+            auto json_string_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
+            if(!json_string_viewer.is_null(row)){
+                std::string str = extract_first_json_string(json_string_viewer.value(row).to_string());
+                JsonValue json_value_from_string_first = JsonValue::from_string(Slice(str));
+                if(!json_value_from_string_first.is_null()) {
+                    json_value = &json_value_from_string_first;
+                }else{
+                    result.append_null();
+                    continue;
+                }
+            } else {
+                result.append_null();
+                continue;
+            }
+        }
+
+        auto path_value = path_viewer.value(row);
+        auto jsonpath = get_prepared_or_parse(context, path_value, &stored_path);
+        if (!jsonpath.ok()) {
+            VLOG(2) << "parse json path failed: " << path_value;
+            result.append_null();
+            continue;
+        }
+
+        builder.clear();
+        vpack::Slice slice = JsonPath::extract(json_value, *jsonpath.value(), &builder);
+        Status st = _convert_json_slice<ResultType>(slice, result);
+        if (!st.ok()) {
+            result.append_null();
+            continue;
+        }
+    }
+    return result.build(ColumnHelper::is_all_const(columns));
 }
 
 } // namespace starrocks

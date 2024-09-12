@@ -136,6 +136,14 @@ public:
     DEFINE_VECTORIZED_FN(json_array);
 
     /**
+    * solve the compatibility problem of spark get_json_object in starrocks.
+     * @param: [json_string, tagged_value]
+    * @paramType: [JsonColumn, BinaryColumn]
+    * @return: BinaryColumn
+    */
+    DEFINE_VECTORIZED_FN(get_native_json_string_spark);
+
+    /**
      * Build empty json array 
      * @param: 
      * @paramType: 
@@ -174,6 +182,8 @@ public:
     // jsonpaths_to_string serializes json patsh to std::string. Setting sub_index to serializes paritially json paths.
     static std::string jsonpaths_to_string(const std::vector<SimpleJsonPath>& jsonpaths, size_t sub_index = -1);
 
+    static std::string extract_first_json_string(const std::string& input);
+
     template <typename ValueType>
     static std::string_view to_json_string(ValueType&& val, size_t limit) {
         std::string_view sv = simdjson::to_json_string(std::forward<ValueType>(val));
@@ -186,6 +196,9 @@ public:
 private:
     template <LogicalType ResultType>
     static StatusOr<ColumnPtr> _json_query_impl(FunctionContext* context, const Columns& columns);
+
+    template <LogicalType ResultType>
+    static StatusOr<ColumnPtr> _json_query_impl_spark(FunctionContext* context, const Columns& columns);
 
     template <LogicalType RresultType>
     DEFINE_VECTORIZED_FN(_flat_json_query_impl);
