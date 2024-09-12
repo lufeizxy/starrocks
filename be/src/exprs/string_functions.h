@@ -260,6 +260,13 @@ public:
     DEFINE_VECTORIZED_FN(rtrim);
 
     /**
+    * @param: [string_value]
+    * @paramType: [BinaryColumn]
+    * @return: BigIntColumn
+    */
+    DEFINE_VECTORIZED_FN(inet_aton);
+
+    /**
      * Return numeric value of left-most character
      *
      * @param: [string_value]
