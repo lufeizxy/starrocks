@@ -52,7 +52,7 @@ namespace starrocks {
         vec_res.resize(column_size);
 
         // Fetch underlying binary data
-        const auto& vec_src = column_binary->get_data();
+        const auto& vec_src = column_binary->get_bytes();
         const auto& offsets_src = column_binary->get_offset();
         size_t prev_offset = 0;
 
@@ -95,9 +95,16 @@ namespace starrocks {
     StatusOr<ColumnPtr> StringFunctions::inet_aton(FunctionContext* context, const Columns& columns) {
         RETURN_IF_COLUMNS_ONLY_NULL(columns);
 
-        const ColumnPtr& haystack = columns[0];
-        std::vector<uint8_t>* null_map = nullptr;
+        ColumnPtr haystack = columns[0];
+        const uint8_t* null_map = nullptr;
 
-        return convert_to_ipv4<IPConvertExceptionMode::Null, Int64Column>(haystack, null_map);
+        if (haystack->is_nullable()) {
+            const auto* column_nullable = down_cast<const NullableColumn*>(haystack.get());
+            haystack = column_nullable->data_column();  // 获取嵌套的非空列
+            null_map = column_nullable->null_column()->raw_data();  // 获取null map的原始数据指针
+        }
+
+        return convert_to_ipv4<IPConvertExceptionMode::Null, Int64Column>(haystack,
+                                                                          reinterpret_cast<const std::vector<uint8> *>(null_map));
     }
 }// namespace starrocks
