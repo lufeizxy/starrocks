@@ -3900,4 +3900,41 @@ PARALLEL_TEST(VecStringFunctionsTest, regexpSplitTest) {
     }
 }
 
+PARALLEL_TEST(VecStringFunctionsTest, InetAtonInvalidIPv4Test) {
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+
+    Columns columns;
+    auto input_column = BinaryColumn::create();
+    input_column->append("999.999.999.999");
+    input_column->append("abc.def.ghi.jkl");
+    input_column->append("");
+    columns.push_back(input_column);
+
+    auto result = StringFunctions::inet_aton(ctx.get(), columns).value();
+    ASSERT_TRUE(StringFunctions::inet_aton(ctx.get(), columns).ok());
+
+    ASSERT_TRUE(result->is_null(0));
+    ASSERT_TRUE(result->is_null(1));
+    ASSERT_TRUE(result->is_null(2));
+}
+
+PARALLEL_TEST(VecStringFunctionsTest, InetAtonValidIPv4Test) {
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+
+    Columns columns;
+    auto input_column = BinaryColumn::create();
+    input_column->append("192.168.1.1");
+    input_column->append("0.0.0.0");
+    input_column->append("255.255.255.255");
+    columns.push_back(input_column);
+
+    auto result = StringFunctions::inet_aton(ctx.get(), columns);
+    ASSERT_TRUE(StringFunctions::inet_aton(ctx.get(), columns).ok());
+
+    auto* res_column = down_cast<Int64Column*>(result.value().get());
+    ASSERT_EQ(res_column->get_data()[0], 3232235777);
+    ASSERT_EQ(res_column->get_data()[1], 0);
+    ASSERT_EQ(res_column->get_data()[2], 4294967295);
+}
+
 } // namespace starrocks

@@ -72,7 +72,7 @@ set(EXPR_FILES
   is_null_predicate.cpp
   json_functions.cpp
   jsonpath.cpp
-  ip_function.cpp
+  inet_aton.cpp
   like_predicate.cpp
   literal.cpp
   locate.cpp

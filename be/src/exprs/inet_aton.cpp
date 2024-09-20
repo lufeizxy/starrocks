@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "exprs/string_functions.h"
-#include "exprs/ip_function.h"
 
 #include <algorithm>
 
@@ -67,7 +66,8 @@ namespace starrocks {
             }
 
             const char* src_start = reinterpret_cast<const char*>(&vec_src[prev_offset]);
-            size_t src_length = offsets_src[i] - prev_offset;
+            size_t src_length = (i < vec_res.size() - 1) ? (offsets_src[i] - prev_offset)
+                                                         : (vec_src.size() - prev_offset);
 
             std::string src(src_start, src_length);
             bool parse_result = try_parse_ipv4(src.c_str(), vec_res[i]);
@@ -100,8 +100,8 @@ namespace starrocks {
 
         if (haystack->is_nullable()) {
             const auto* column_nullable = down_cast<const NullableColumn*>(haystack.get());
-            haystack = column_nullable->data_column();  // 获取嵌套的非空列
-            null_map = column_nullable->null_column()->raw_data();  // 获取null map的原始数据指针
+            haystack = column_nullable->data_column();
+            null_map = column_nullable->null_column()->raw_data();
         }
 
         return convert_to_ipv4<IPConvertExceptionMode::Null, Int64Column>(haystack,
